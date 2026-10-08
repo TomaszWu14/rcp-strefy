@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block title %}Użytkownicy – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>👥 Użytkownicy ({{ all_count }})</h2>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <form method="GET" class="filter-form">
+    <select name="filtr_rola" onchange="this.form.submit()">
+      <option value="">— Wszystkie role —</option>
+      <option value="kierownik"  {% if request.args.get('filtr_rola')=='kierownik' %}selected{% endif %}>Admin</option>
+      <option value="super_user" {% if request.args.get('filtr_rola')=='super_user' %}selected{% endif %}>Super User</option>
+      <option value="lider"      {% if request.args.get('filtr_rola')=='lider' %}selected{% endif %}>Liderzy</option>
+    </select>
+    <input type="text" name="search" value="{{ search_u }}" placeholder="🔍 Login / nazwisko / HU..." class="search-input" style="min-width:220px">
+    <button type="submit" class="btn-sm btn-ok">Szukaj</button>
+    {% if search_u or request.args.get('filtr_rola') %}<a href="{{ url_for('uzytkownicy') }}" class="btn-sm">✕</a>{% endif %}
+  </form>
+  <!-- Import / Eksport -->
+  <a href="{{ url_for('eksport_uzytkownicy') }}" class="btn-sm btn-ok">⬇️ Eksport CSV</a>
+  <button type="button" class="btn-sm btn-warn" onclick="document.getElementById('importModal').style.display='flex'">⬆️ Import Excel</button>
+  </div>
+</div>
+
+<div class="two-col" style="align-items:start">
+
+  <!-- FORMULARZ DODAJ / EDYTUJ -->
+  <div class="form-card" id="userForm">
+    <h3 id="formTitle">➕ Nowy użytkownik</h3>
+    <form method="POST" id="mainUserForm">
+      <input type="hidden" name="action"    id="formAction"    value="add">
+      <input type="hidden" name="login"     id="formLogin"     value="">
+      <input type="hidden" name="login_new" id="formLoginNew"  value="">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Login <span style="color:#ef4444;font-size:11px" id="loginNote">(unikalny)</span></label>
+          <input type="text" name="login_new" id="inputLogin" placeholder="np. JKOWALSKI" required autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>Hasło <span style="color:var(--text2);font-size:11px" id="passNote">(min. 4 znaki)</span></label>
+          <input type="text" name="password" id="inputPassword" placeholder="puste = losowe hasło jednorazowe" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Imię Nazwisko</label>
+        <input type="text" name="name" id="inputName" placeholder="Jan Kowalski">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>HU</label>
+          <input type="text" name="hu" id="inputHu" list="hu-list" placeholder="HU_KOWALSKI_JAN">
+          <datalist id="hu-list">{% for h in hu_list %}<option value="{{ h }}">{% endfor %}</datalist>
+        </div>
+        <div class="form-group">
+          <label>Rola</label>
+          <select name="role" id="inputRole">
+            <option value="lider">Lider</option>
+            <option value="super_user">Super User</option>
+            <option value="kierownik">Admin (Kierownik)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dział</label>
+          <select name="dzial" id="inputDzial">
+            <option value="">— wybierz —</option>
+            {% for d in dzialy %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Grupa zasobów</label>
+          <select name="resource_group" id="inputResourceGroup">
+            <option value="">— wybierz —</option>
+            {% for rg in resource_groups %}<option value="{{ rg }}">{{ rg }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button type="submit" class="btn-primary" id="submitBtn">✅ Dodaj użytkownika</button>
+        <button type="button" class="btn-secondary" onclick="resetForm()">Wyczyść</button>
+      </div>
+    </form>
+
+    <!-- Reset hasła (osobna forma, widoczna tylko przy edycji) -->
+    <div id="resetBlock" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <h4 style="font-size:13px;margin-bottom:10px;color:var(--text2)">🔑 Szybka zmiana hasła</h4>
+      <form method="POST" style="display:flex;gap:8px;align-items:flex-end">
+        <input type="hidden" name="action" value="reset_password">
+        <input type="hidden" name="login" id="resetLogin" value="">
+        <div class="form-group" style="flex:1;margin:0">
+          <input type="text" name="new_password" placeholder="Nowe hasło (puste = losowe)" autocomplete="off">
+        </div>
+        <button type="submit" class="btn-sm btn-warn">Zmień hasło</button>
+      </form>
+    </div>
+
+    <!-- Panel uprawnień (widoczny tylko przy edycji) -->
+    <div id="permBlock" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <h4 style="font-size:13px;margin-bottom:10px;color:var(--text2)">🔒 Uprawnienia indywidualne</h4>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Nadpisują domyślne uprawnienia roli. Zostaw bez zmian = używa wartości domyślnych.</p>
+      <form method="POST" id="permForm">
+        <input type="hidden" name="action" value="set_permissions">
+        <input type="hidden" name="login" id="permLogin" value="">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:12px">
+          {% for perm_key, perm_label in permission_labels.items() %}
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="perm_{{ perm_key }}" value="1"
+                   id="perm_{{ perm_key }}" style="width:14px;height:14px">
+            {{ perm_label }}
+          </label>
+          {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="submit" class="btn-sm btn-ok">Zapisz uprawnienia</button>
+          <button type="button" class="btn-sm" onclick="resetPermToRole()">Resetuj do roli</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TABELA USERÓW -->
+  <div class="table-box">
+    <div class="table-header">
+      <span>{{ users|length }} użytkowników{% if search_u %} (filtr: "{{ search_u }}"){% endif %}</span>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="data-table" id="userTbl" style="table-layout:auto">
+      <thead>
+        <tr>
+          <th>Login</th>
+          <th>Nazwa</th>
+          <th>HU</th>
+          <th>Dział</th>
+          <th>Grupa</th>
+          <th>Rola</th>
+          <th>Status</th>
+          <th style="min-width:130px">Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for login, u in users.items() %}
+        <tr class="{{ '' if u.get('aktualny',True) else 'row-inactive' }}">
+          <td class="td-mono" style="font-size:12px;white-space:nowrap">{{ login }}</td>
+          <td style="white-space:nowrap">{{ u.name }}</td>
+          <td class="td-mono" style="font-size:11px;white-space:nowrap">{{ u.hu }}</td>
+          <td style="font-size:11px">
+            <form method="POST" style="display:inline" id="dz-{{ loop.index }}">
+              <input type="hidden" name="action" value="edit_dzial">
+              <input type="hidden" name="login" value="{{ login }}">
+              <select name="dzial" onchange="document.getElementById('dz-{{ loop.index }}').submit()"
+                style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px;padding:2px 4px;max-width:140px">
+                <option value="">—</option>
+                {% for d in dzialy %}<option value="{{ d }}" {% if u.get('dzial')==d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+              </select>
+            </form>
+          </td>
+          <td style="font-size:11px">
+            <span style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;white-space:nowrap">
+              {{ u.get('resource_group','—') or '—' }}
+            </span>
+          </td>
+          <td>
+            {% set r = u.get('role','lider') %}
+            {% if r == 'kierownik' %}
+              <span class="badge badge-mgr">👑 Admin</span>
+            {% elif r == 'super_user' %}
+              <span class="badge badge-super">⭐ Super</span>
+            {% else %}
+              <span class="badge badge-ldr">🔑 Lider</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="status-badge {{ 'status-zaakceptowane' if u.get('aktualny',True) else 'status-odrzucone' }}">
+              {{ 'aktywny' if u.get('aktualny',True) else 'nieaktywny' }}
+            </span>
+          </td>
+          <td class="td-actions" style="white-space:nowrap">
+            <button type="button" class="btn-sm btn-warn" title="Edytuj"
+              onclick="loadEdit('{{ login }}','{{ u.name }}','{{ u.hu }}','{{ u.get('role','pracownik') }}','{{ u.get('dzial','') }}','{{ u.get('resource_group','') }}')">✏️</button>
+            <button type="button" class="btn-sm" title="Uprawnienia"
+              onclick="loadPerms('{{ login }}',{{ get_user_permissions(login)|tojson }})">🔒</button>
+            <form method="POST" style="display:inline">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="login" value="{{ login }}">
+              <button type="submit" class="btn-sm {{ 'btn-warn' if u.get('aktualny',True) else 'btn-ok' }}"
+                title="{{ 'Dezaktywuj' if u.get('aktualny',True) else 'Aktywuj' }}">
+                {{ '⏸' if u.get('aktualny',True) else '▶' }}
+              </button>
+            </form>
+            {% if login != 'admin' %}
+            <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć użytkownika {{ login }}?')">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="login" value="{{ login }}">
+              <button type="submit" class="btn-sm btn-del" title="Usuń">🗑</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="td-empty">Brak wyników.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_PERMISSIONS = {{ default_permissions|tojson }};
+
+function loadEdit(login, name, hu, role, dzial, rg){
+  document.getElementById('formTitle').textContent         = '✏️ Edytuj: ' + login;
+  document.getElementById('formAction').value              = 'edit';
+  document.getElementById('formLogin').value               = login;
+  document.getElementById('formLoginNew').value            = '';
+  document.getElementById('inputLogin').value              = login;
+  document.getElementById('inputLogin').readOnly           = true;
+  document.getElementById('inputLogin').style.opacity      = '.5';
+  document.getElementById('loginNote').textContent         = '(nie można zmienić)';
+  document.getElementById('inputName').value               = name;
+  document.getElementById('inputHu').value                 = hu;
+  document.getElementById('inputRole').value               = role;
+  document.getElementById('inputDzial').value              = dzial;
+  document.getElementById('inputResourceGroup').value      = rg || '';
+  document.getElementById('inputPassword').placeholder     = '(zostaw puste = bez zmian)';
+  document.getElementById('inputPassword').required        = false;
+  document.getElementById('passNote').textContent          = '(zostaw puste aby nie zmieniać)';
+  document.getElementById('submitBtn').textContent         = '💾 Zapisz zmiany';
+  document.getElementById('resetBlock').style.display      = 'block';
+  document.getElementById('resetLogin').value              = login;
+  document.getElementById('permBlock').style.display       = 'none';
+  document.getElementById('userForm').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function loadPerms(login, effectivePerms){
+  document.getElementById('permBlock').style.display = 'block';
+  document.getElementById('permLogin').value         = login;
+  for (const [key, val] of Object.entries(effectivePerms)){
+    const cb = document.getElementById('perm_' + key);
+    if(cb) cb.checked = val;
+  }
+  document.getElementById('userForm').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function resetPermToRole(){
+  const role = document.getElementById('inputRole').value || 'pracownik';
+  const defaults = DEFAULT_PERMISSIONS[role] || {};
+  for (const [key, val] of Object.entries(defaults)){
+    const cb = document.getElementById('perm_' + key);
+    if(cb) cb.checked = val;
+  }
+}
+
+function resetForm(){
+  document.getElementById('formTitle').textContent         = '➕ Nowy użytkownik';
+  document.getElementById('formAction').value              = 'add';
+  document.getElementById('formLogin').value               = '';
+  document.getElementById('inputLogin').value              = '';
+  document.getElementById('inputLogin').readOnly           = false;
+  document.getElementById('inputLogin').style.opacity      = '1';
+  document.getElementById('loginNote').textContent         = '(unikalny)';
+  document.getElementById('inputName').value               = '';
+  document.getElementById('inputHu').value                 = '';
+  document.getElementById('inputRole').value               = 'pracownik';
+  document.getElementById('inputDzial').value              = '';
+  document.getElementById('inputResourceGroup').value      = '';
+  document.getElementById('inputPassword').value           = '';
+  document.getElementById('inputPassword').placeholder     = 'puste = losowe hasło jednorazowe';
+  document.getElementById('inputPassword').required        = true;
+  document.getElementById('passNote').textContent          = '(min. 4 znaki)';
+  document.getElementById('submitBtn').textContent         = '✅ Dodaj użytkownika';
+  document.getElementById('resetBlock').style.display      = 'none';
+  document.getElementById('permBlock').style.display       = 'none';
+}
+
+document.getElementById('mainUserForm').addEventListener('submit', function(){
+  const act = document.getElementById('formAction').value;
+  if(act === 'add'){
+    const loginVal = document.getElementById('inputLogin').value.trim().toUpperCase();
+    document.getElementById('formLogin').value    = loginVal;
+    document.getElementById('formLoginNew').value = loginVal;
+  }
+});
+</script>
+
+<!-- Modal importu -->
+<div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:24px;min-width:380px;max-width:95vw">
+    <h3 style="margin-bottom:16px">⬆️ Import użytkowników z Excela</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+      Plik Excel musi zawierać kolumny: <strong>login, name, role, hu, dzial, resource_group, haslo</strong><br>
+      Role: <code>lider</code>, <code>super_user</code>, <code>kierownik</code><br>
+      Istniejące loginy zostaną pominięte.
+    </p>
+    <form method="POST" action="{{ url_for('import_uzytkownicy') }}" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Plik Excel (.xlsx)</label>
+        <input type="file" name="plik" accept=".xlsx,.xls" required>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button type="submit" class="btn-primary">Importuj</button>
+        <button type="button" class="btn-secondary" onclick="document.getElementById('importModal').style.display='none'">Anuluj</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

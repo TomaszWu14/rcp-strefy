@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}TIMER{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="navbar">
+  <div class="nav-brand">⏱ TIMER</div>
+  <div class="nav-links">
+    <a href="{{ url_for('dashboard') }}"  class="{% if request.endpoint=='dashboard' %}active{% endif %}">🏠 Dashboard</a>
+    {% if perms.view_kpi %}
+    <a href="{{ url_for('kpi') }}"        class="{% if request.endpoint=='kpi' %}active{% endif %}">📊 KPI</a>
+    {% endif %}
+    <a href="{{ url_for('szczegoly') }}"  class="{% if request.endpoint=='szczegoly' %}active{% endif %}">📋 Szczegóły</a>
+    <a href="{{ url_for('pracownik_search') }}" class="{% if request.endpoint=='pracownik_search' %}active{% endif %}">🔍 Pracownik</a>
+    <a href="{{ url_for('zgloszenia') }}" class="{% if request.endpoint=='zgloszenia' %}active{% endif %}">
+      ⚠️ Zgłoszenia{% if pending_notif > 0 %}<span class="notif-badge">{{ pending_notif }}</span>{% endif %}
+    </a>
+    {% if perms.manage_subzones %}
+    <a href="{{ url_for('podstrefy') }}"  class="{% if request.endpoint=='podstrefy' %}active{% endif %}">🗂 Podstrefy</a>
+    {% endif %}
+    {% if perms.view_schedule %}
+    <a href="{{ url_for('grafik') }}"     class="{% if request.endpoint=='grafik' %}active{% endif %}">📅 Grafik</a>
+    {% endif %}
+    {% if perms.approve_reports %}
+    <a href="{{ url_for('korekty') }}"    class="{% if request.endpoint=='korekty' %}active{% endif %}">✏️ Korekty</a>
+    {% endif %}
+    {% if perms.manage_users %}
+    <a href="{{ url_for('uzytkownicy') }}" class="{% if request.endpoint=='uzytkownicy' %}active{% endif %}">👥 Użytkownicy</a>
+    {% endif %}
+    {% if perms.manage_dictionaries %}
+    <a href="{{ url_for('slowniki') }}"   class="{% if request.endpoint=='slowniki' %}active{% endif %}">📖 Słowniki</a>
+    {% endif %}
+    {% if perms.manage_settings %}
+    <a href="{{ url_for('ustawienia') }}" class="{% if request.endpoint=='ustawienia' %}active{% endif %}">⚙️ Ustawienia</a>
+    {% endif %}
+  </div>
+  <div class="nav-user">
+    {% if is_kierownik %}
+      <span class="badge badge-mgr">👑 Admin</span>
+    {% elif is_super_user %}
+      <span class="badge" style="background:#7c3aed;color:#fff">⭐ Super User</span>
+    {% else %}
+      <span class="badge badge-ldr">🔑 Lider</span>
+    {% endif %}
+    <a href="{{ url_for('moje_konto') }}" class="nav-name {% if request.endpoint=='moje_konto' %}active{% endif %}" style="text-decoration:none">{{ user_info.get('name', current_user) }}</a>
+    <a href="{{ url_for('logout') }}" class="btn-logout">Wyloguj</a>
+  </div>
+</nav>
+<main class="main-content">
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat,msg in msgs %}<div class="alert alert-{{ cat }}">{{ msg }}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<script src="{{ url_for('static',filename='js/app.js') }}"></script>
+</body>
+</html>

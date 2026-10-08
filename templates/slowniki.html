@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Słowniki – TIMER{% endblock %}
+{% block content %}
+<div class="page-header"><h2>📖 Konfigurowalne słowniki</h2></div>
+<div class="two-col">
+  <div class="form-card">
+    <h3>Dodaj pozycję</h3>
+    <form method="POST">
+      <div class="form-group"><label>Typ</label>
+        <select name="typ">
+          <option value="strefy">Strefa robocza</option>
+          <option value="podstrefy">Podstrefa</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Nazwa (np. STREFA_NOWA)</label>
+        <input type="text" name="wartosc" placeholder="STREFA_..." required>
+      </div>
+      <input type="hidden" name="action" value="add">
+      <button type="submit" class="btn-primary">Dodaj ✓</button>
+    </form>
+  </div>
+  <div>
+    <div class="table-box" style="margin-bottom:16px">
+      <div class="table-header"><h3>Strefy robocze ({{ slowniki.strefy|length }})</h3></div>
+      <table class="data-table" style="table-layout:auto">
+        <tbody>
+          {% for s in slowniki.strefy %}
+          <tr>
+            <td><span class="strefa-badge strefa-sm">{{ s }}</span></td>
+            <td>
+              <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć {{ s }}?')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="typ" value="strefy">
+                <input type="hidden" name="wartosc" value="{{ s }}">
+                <button type="submit" class="btn-sm btn-del">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-box">
+      <div class="table-header"><h3>Podstrefy ({{ slowniki.podstrefy|length }})</h3></div>
+      <table class="data-table" style="table-layout:auto">
+        <tbody>
+          {% for s in slowniki.podstrefy %}
+          <tr>
+            <td style="font-size:12px">{{ s }}</td>
+            <td>
+              <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć?')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="typ" value="podstrefy">
+                <input type="hidden" name="wartosc" value="{{ s }}">
+                <button type="submit" class="btn-sm btn-del">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

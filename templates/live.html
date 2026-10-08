@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Live – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>🔴 Podgląd Live — ostatnia aktywność</h2>
+  <button onclick="location.reload()" class="btn-secondary btn-sm">↻ Odśwież</button>
+</div>
+<p class="text-muted" style="margin-bottom:16px;font-size:12px">Pokazuje ostatnią strefę każdego pracownika z ostatnich 24h danych.</p>
+
+<div style="display:flex;flex-wrap:wrap;gap:12px">
+  {% for a in aktywni %}
+  <div style="background:var(--bg2);border:1px solid {{ a.color }}44;border-left:3px solid {{ a.color }};border-radius:8px;padding:12px 16px;min-width:200px;flex:1">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">{{ a.pracownik }}</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:6px;font-family:monospace">{{ a.hu }}</div>
+    <span class="strefa-badge" style="background:{{ a.color }}22;color:{{ a.color }};border:1px solid {{ a.color }}44;font-size:11px">{{ a.strefa }}</span>
+    <div style="font-size:11px;color:var(--text2);margin-top:6px">ostatni skan: {{ a.dt_exit }}</div>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">😴</div><h3>Brak aktywności</h3></div>
+  {% endfor %}
+</div>
+<script>setTimeout(()=>location.reload(), 60000);</script>
+{% endblock %}

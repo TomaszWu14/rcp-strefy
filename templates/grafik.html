@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Grafik – TIMER{% endblock %}
+{% block content %}
+<div class="page-header"><h2>📅 Grafik obecności</h2></div>
+
+<div class="two-col">
+  <div class="form-card">
+    <h3>Dodaj wpis</h3>
+    <form method="POST">
+      <input type="hidden" name="action" value="add">
+      <div class="form-group"><label>HU pracownika</label>
+        <input type="text" name="hu" list="hu-list" required placeholder="HU_NAZWISKO_IMI">
+        <datalist id="hu-list">{% for h in hu_list %}<option value="{{ h }}">{% endfor %}</datalist>
+      </div>
+      <div class="form-group"><label>Data</label><input type="date" name="data" required></div>
+      <div class="form-row">
+        <div class="form-group"><label>Godz. od</label><input type="time" name="godz_od" value="06:00"></div>
+        <div class="form-group"><label>Godz. do</label><input type="time" name="godz_do" value="14:00"></div>
+      </div>
+      <div class="form-group"><label>Planowane godziny</label>
+        <input type="number" name="godz_plan" value="8" min="1" max="24" step="0.5">
+      </div>
+      <button type="submit" class="btn-primary">Dodaj ✓</button>
+    </form>
+  </div>
+
+  <div>
+    {% if niezgodnosci %}
+    <div class="table-box" style="margin-bottom:16px">
+      <div class="table-header"><h3 style="color:#ef4444">⚠️ Niezgodności SAP vs grafik ({{ niezgodnosci|length }})</h3></div>
+      <table class="data-table" style="table-layout:auto">
+        <thead><tr><th>Data</th><th>HU</th><th>Plan h</th><th>SAP h</th><th>Różnica</th></tr></thead>
+        <tbody>
+          {% for n in niezgodnosci %}
+          <tr>
+            <td style="white-space:nowrap">{{ n.data }}</td>
+            <td style="font-size:11px">{{ n.hu }}</td>
+            <td class="td-mono">{{ n.plan_h }}</td>
+            <td class="td-mono">{{ n.sap_h }}</td>
+            <td class="td-mono" style="color:{{ '#ef4444' if n.diff_h < 0 else '#f59e0b' }};font-weight:600">
+              {{ '+' if n.diff_h > 0 else '' }}{{ n.diff_h }}h
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div class="table-box">
+      <div class="table-header">
+        <h3>Grafik ({{ records|length }})</h3>
+        <form method="GET" class="inline-form">
+          <input type="text" name="search" value="{{ search }}" placeholder="🔍 HU lub data..." class="search-input">
+          <button type="submit" class="btn-sm btn-ok">Szukaj</button>
+          {% if search %}<a href="{{ url_for('grafik') }}" class="btn-sm">✕</a>{% endif %}
+        </form>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="data-table" style="table-layout:auto">
+        <thead><tr><th>Data</th><th>HU</th><th>Od</th><th>Do</th><th>Plan h</th><th>Akcja</th></tr></thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td style="white-space:nowrap">{{ r.data }}</td>
+            <td style="font-size:11px">{{ r.hu }}</td>
+            <td class="td-mono">{{ r.godz_od }}</td>
+            <td class="td-mono">{{ r.godz_do }}</td>
+            <td class="td-mono">{{ r.godz_plan }}</td>
+            <td>
+              <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć?')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="record_id" value="{{ r.id }}">
+                <button type="submit" class="btn-sm btn-del">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="td-empty">Brak wpisów.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

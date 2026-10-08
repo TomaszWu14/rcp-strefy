@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Wyszukiwarka pracownika – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>🔍 Wyszukiwarka pracownika</h2>
+  <form method="GET" class="filter-form">
+    <input type="text" name="q" value="{{ query }}" placeholder="Nazwisko lub HU..." class="search-input" style="min-width:260px" autofocus>
+    <button type="submit" class="btn-primary">Szukaj</button>
+    {% if query %}<a href="{{ url_for('pracownik_search') }}" class="btn-sm">✕</a>{% endif %}
+  </form>
+</div>
+
+{% if query and not wyniki and not profil %}
+  <div class="alert alert-info">Brak wyników dla "{{ query }}".</div>
+{% endif %}
+
+{% if wyniki and not pracownik_name %}
+<div class="table-box" style="max-width:500px">
+  <div class="table-header"><span>Wyniki ({{ wyniki|length }})</span></div>
+  <table class="data-table">
+    <tbody>
+      {% for w in wyniki %}
+      <tr>
+        <td>
+          <a href="{{ url_for('pracownik_search') }}?pracownik={{ w }}&q={{ query }}"
+             style="color:var(--blue2);text-decoration:none;font-weight:600">{{ w }}</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if profil %}
+<div class="two-col" style="align-items:start">
+
+  <!-- PROFIL PODSTAWOWY -->
+  <div class="form-card">
+    <h3>👤 {{ profil.pracownik }}</h3>
+    <table class="data-table" style="margin-bottom:0">
+      <tbody>
+        <tr><td style="color:var(--text2);width:130px">HU</td><td class="td-mono">{{ profil.hu }}</td></tr>
+        <tr><td style="color:var(--text2)">Dział</td><td>{{ profil.dzial }}</td></tr>
+        <tr><td style="color:var(--text2)">Miesiąc</td><td>{{ profil.miesiac }}</td></tr>
+        <tr>
+          <td style="color:var(--text2)">Dziś w pracy</td>
+          <td>
+            {% if profil.aktywny_dzis %}
+              <span class="status-badge status-zaakceptowane">✅ TAK</span>
+              <span style="font-size:11px;color:var(--text2);margin-left:6px">
+                {{ profil.grafik_dzis.godz_od or '' }}–{{ profil.grafik_dzis.godz_do or '' }}
+                ({{ profil.grafik_dzis.godz_plan or '8' }}h)
+              </span>
+            {% else %}
+              <span class="status-badge status-odrzucone">❌ Brak w grafiku</span>
+            {% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Strefy bieżącego miesiąca -->
+    <h4 style="margin-top:16px;font-size:13px;color:var(--text2)">Strefy — {{ profil.miesiac }}</h4>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px">
+      {% for s in profil.strefy %}
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:50%;background:{{ s.color }};flex-shrink:0"></span>
+        <span style="flex:1;font-size:12px">{{ s.strefa.replace('STREFA_','') }}</span>
+        <span class="td-mono" style="font-size:12px">{{ s.czas_hms }}</span>
+      </div>
+      {% else %}
+      <span style="color:var(--text2);font-size:12px">Brak danych</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <!-- ZGŁOSZENIA -->
+    <div class="form-card" style="margin-bottom:16px">
+      <h4 style="font-size:13px;margin-bottom:10px">⚠️ Zgłoszenia (ostatnie {{ profil.zgloszenia|length }})</h4>
+      {% if profil.zgloszenia %}
+      <table class="data-table" style="font-size:12px">
+        <thead><tr><th>Data</th><th>Typ</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for z in profil.zgloszenia %}
+          <tr>
+            <td>{{ z.data_pracy }}</td>
+            <td>{{ z.typ_problemu }}</td>
+            <td><span class="status-badge status-{{ z.status }}">{{ z.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--text2);font-size:12px">Brak zgłoszeń.</p>
+      {% endif %}
+    </div>
+
+    <!-- PODSTREFY -->
+    <div class="form-card">
+      <h4 style="font-size:13px;margin-bottom:10px">🗂 Podstrefy (ostatnie {{ profil.podstrefy|length }})</h4>
+      {% if profil.podstrefy %}
+      <table class="data-table" style="font-size:12px">
+        <thead><tr><th>Data</th><th>INNE</th><th>ZERO</th><th>Zatw.</th></tr></thead>
+        <tbody>
+          {% for r in profil.podstrefy %}
+          <tr>
+            <td>{{ r.data }}</td>
+            <td class="td-mono">{{ r.strefa_inne }}</td>
+            <td class="td-mono">{{ r.strefa_zero }}</td>
+            <td>
+              {% if r.get('zatwierdzone') %}
+                <span class="status-badge status-zaakceptowane">✅</span>
+              {% else %}
+                <span class="status-badge status-nowe">⏳</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:var(--text2);font-size:12px">Brak wpisów podstref.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endif %}
+{% endblock %}

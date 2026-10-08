@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Szczegóły – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>📋 Szczegóły</h2>
+  <a href="{{ url_for('eksport', data_od=data_od, data_do=data_do) }}" class="btn-secondary btn-sm">⬇ CSV</a>
+</div>
+
+<form method="GET" class="filter-card">
+  <div class="filter-row" style="gap:16px;align-items:flex-end">
+    <div class="filter-group" style="min-width:150px"><label>Data od</label><input type="date" name="data_od" value="{{ data_od }}" onchange="this.form.submit()"></div>
+    <div class="filter-group" style="min-width:150px"><label>Data do</label><input type="date" name="data_do" value="{{ data_do }}" onchange="this.form.submit()"></div>
+    {% if is_kierownik or is_lider %}
+    <div class="filter-group" style="min-width:200px"><label>Pracownik</label>
+      <select name="pracownik" onchange="this.form.submit()">
+        <option value="">— Wszyscy —</option>
+        {% for p in pracownicy %}<option value="{{ p }}" {% if p==pracownik_f %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-group" style="min-width:200px;flex:1"><label>Strefy</label>
+      <select name="strefy" multiple size="4" onchange="this.form.submit()">
+        {% for s in strefy_all %}<option value="{{ s }}" {% if s in strefy_f %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-group" style="align-self:flex-end"><a href="{{ url_for('szczegoly') }}" class="btn-secondary">✕ Reset</a></div>
+  </div>
+</form>
+
+<!-- TABS -->
+<div class="tabs" style="display:flex;gap:4px;margin-bottom:16px">
+  <button class="tab-btn active" onclick="showTab('tabDaily',this)">📅 Dzienny pivot</button>
+  <button class="tab-btn" onclick="showTab('tabMonthly',this)">📆 Miesięczne</button>
+  <button class="tab-btn" onclick="showTab('tabPodstrefy',this)">🗂 Podstrefy</button>
+</div>
+
+<!-- TAB 1: DZIENNY PIVOT -->
+<div id="tabDaily" class="tab-panel">
+  <div class="table-box">
+    <div class="table-header">
+      <span id="rowCount">{{ rows|length }} wierszy</span>
+      <span class="text-muted" style="font-size:11px">Kliknij ▼ w nagłówku · jeden wiersz = jeden dzień jednego pracownika</span>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="data-table pivot-day" id="szTbl" style="table-layout:auto">
+      <thead>
+        <tr>
+          <th style="min-width:90px;position:sticky;left:0;background:var(--bg2);z-index:3">Data</th>
+          <th style="min-width:140px;position:sticky;left:90px;background:var(--bg2);z-index:3">Pracownik</th>
+          {% for s in strefy_pivot %}
+          <th style="min-width:80px;text-align:center;font-size:11px;white-space:nowrap"
+              title="{{ s }}"
+              {% if STREFA_COLORS %}style="min-width:80px;text-align:center;font-size:11px;color:{{ STREFA_COLORS.get(s,'#94a3b8') }}"{% endif %}>
+            {{ s|replace('STREFA_','') }}
+          </th>
+          {% endfor %}
+          <th style="min-width:85px;font-weight:700;background:rgba(55,86,35,.15)">ŁĄCZNIE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="white-space:nowrap;position:sticky;left:0;background:var(--bg2);font-family:monospace;font-size:12px">{{ r.data }}</td>
+          <td style="white-space:nowrap;position:sticky;left:90px;background:var(--bg2);font-size:12px">{{ r.pracownik }}</td>
+          {% for s in strefy_pivot %}
+          {% set v = r.strefy.get(s,'') %}
+          <td style="text-align:center;padding:5px 6px;font-family:monospace;font-size:11px">
+            {% if v %}{{ v }}{% else %}<span style="color:var(--border)">·</span>{% endif %}
+          </td>
+          {% endfor %}
+          <td style="font-family:monospace;font-size:12px;font-weight:700;background:rgba(55,86,35,.08)">{{ r.total }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ (strefy_pivot|length)+3 }}" class="td-empty">Brak danych.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: MIESIĘCZNE -->
+<div id="tabMonthly" class="tab-panel" style="display:none">
+  <div class="table-box">
+    <div class="table-header"><h3>Suma miesięczna per pracownik</h3></div>
+    <div style="overflow-x:auto">
+    <table class="data-table" id="monTbl" style="table-layout:auto">
+      <thead>
+        <tr>
+          <th>Miesiąc</th><th>Pracownik</th><th>Łączny czas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in monthly_rows %}
+        <tr>
+          <td style="font-family:monospace;white-space:nowrap">{{ r.miesiac }}</td>
+          <td>{{ r.pracownik }}</td>
+          <td style="font-family:monospace;font-weight:600">{{ r.total }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="td-empty">Brak danych.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 3: PODSTREFY -->
+<div id="tabPodstrefy" class="tab-panel" style="display:none">
+  <div class="table-box">
+    <div class="table-header"><h3>Rozpisane podstrefy ({{ podstr_recs|length }})</h3></div>
+    <div style="overflow-x:auto">
+    <table class="data-table" id="podTbl" style="table-layout:auto">
+      <thead>
+        <tr><th>Data</th><th>HU</th><th>Dział</th><th>INNE</th><th>ZERO</th><th>Podstrefa 1</th><th>Czas 1</th><th>Podstrefa 2</th><th>Czas 2</th></tr>
+      </thead>
+      <tbody>
+        {% for r in podstr_recs %}
+        <tr>
+          <td style="white-space:nowrap">{{ r.data }}</td>
+          <td style="font-size:11px;white-space:nowrap">{{ r.hu }}</td>
+          <td style="font-size:11px">{{ r.dzial }}</td>
+          <td style="font-family:monospace">{{ r.strefa_inne }}</td>
+          <td style="font-family:monospace">{{ r.strefa_zero }}</td>
+          {% set ps0 = r.podstrefy[0] if r.podstrefy|length > 0 else None %}
+          {% set ps1 = r.podstrefy[1] if r.podstrefy|length > 1 else None %}
+          <td style="font-size:11px">{{ ps0.podstrefa|replace('STREFA_','') if ps0 else '' }}</td>
+          <td style="font-family:monospace">{{ ps0.czas if ps0 else '' }}</td>
+          <td style="font-size:11px">{{ ps1.podstrefa|replace('STREFA_','') if ps1 else '' }}</td>
+          <td style="font-family:monospace">{{ ps1.czas if ps1 else '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="td-empty">Brak rozpisanych podstref w tym zakresie.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static',filename='js/excel_filter.js') }}"></script>
+<script>
+function showTab(id, btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).style.display='block';
+  btn.classList.add('active');
+}
+initExcelFilters('szTbl',[0,1]);
+initExcelFilters('monTbl',[0,1]);
+</script>
+{% endblock %}

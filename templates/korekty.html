@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Historia korekt – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>✏️ Historia korekt danych</h2>
+  <form method="GET" class="filter-form">
+    <input type="text" name="search" value="{{ search }}" placeholder="🔍 Pracownik / data..." class="search-input" style="min-width:220px">
+    <button type="submit" class="btn-sm btn-ok">Szukaj</button>
+    {% if search %}<a href="{{ url_for('korekty') }}" class="btn-sm">✕</a>{% endif %}
+  </form>
+</div>
+
+<div class="table-box">
+  <div class="table-header">
+    <span>{{ korekty|length }} korekt{% if search %} (filtr: "{{ search }}"){% endif %}</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Data korekty</th>
+        <th>Data pracy</th>
+        <th>Pracownik</th>
+        <th>HU</th>
+        <th>Typ</th>
+        <th>Strefa -</th>
+        <th>Czas -</th>
+        <th>Strefa +</th>
+        <th>Czas +</th>
+        <th>Opis</th>
+        <th>Zatwierdził</th>
+        <th>Zgłoszenie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in korekty %}
+      <tr>
+        <td class="td-mono" style="font-size:11px;white-space:nowrap">{{ k.timestamp[:16] }}</td>
+        <td class="td-mono">{{ k.data }}</td>
+        <td>{{ k.pracownik }}</td>
+        <td class="td-mono" style="font-size:11px">{{ k.hu }}</td>
+        <td>
+          <span class="badge" style="background:var(--bg3);color:var(--text2);font-size:10px">{{ k.typ }}</span>
+        </td>
+        <td style="color:var(--red);font-size:12px">{{ k.strefa_minus or '—' }}</td>
+        <td class="td-mono" style="color:var(--red);font-size:12px">
+          {% if k.czas_minus_s %}{{ '%02d:%02d:%02d'|format(k.czas_minus_s//3600,(k.czas_minus_s%3600)//60,k.czas_minus_s%60) }}{% else %}—{% endif %}
+        </td>
+        <td style="color:var(--green2);font-size:12px">{{ k.strefa_plus or '—' }}</td>
+        <td class="td-mono" style="color:var(--green2);font-size:12px">
+          {% if k.czas_plus_s %}{{ '%02d:%02d:%02d'|format(k.czas_plus_s//3600,(k.czas_plus_s%3600)//60,k.czas_plus_s%60) }}{% else %}—{% endif %}
+        </td>
+        <td style="font-size:11px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ k.opis }}">{{ k.opis or '—' }}</td>
+        <td style="font-size:11px">{{ k.akceptowal }}</td>
+        <td class="td-mono" style="font-size:11px">{{ k.zgloszenie_id }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="12" class="td-empty">Brak korekt.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

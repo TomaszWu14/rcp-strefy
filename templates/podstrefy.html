@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Podstrefy – TIMER{% endblock %}
+{% block content %}
+<div class="page-header"><h2>🗂 Podstrefy — STREFA_INNE / STREFA_ZERO</h2></div>
+
+<div class="table-box" style="margin-bottom:20px">
+  <div class="table-header">
+    <h3>Do rozpisania — kliknij ➕ przy pracowniku</h3>
+    <form method="GET" class="inline-form" id="rangeForm">
+      <input type="date" name="data_od" value="{{ data_od_p }}" onchange="document.getElementById('rangeForm').submit()">
+      <span class="text-muted">–</span>
+      <input type="date" name="data_do" value="{{ data_do_p }}" onchange="document.getElementById('rangeForm').submit()">
+      {% if data_od_p or data_do_p %}<a href="{{ url_for('podstrefy') }}" class="btn-sm">✕</a>{% endif %}
+    </form>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="data-table" id="kandTbl" style="table-layout:auto">
+    <thead><tr><th>Data</th><th>HU</th><th>Dział</th><th>Strefa</th><th>Czas</th><th style="width:50px"></th></tr></thead>
+    <tbody>
+      {% for k in kandidaci %}
+      <tr>
+        <td style="white-space:nowrap">{{ k.data.strftime('%Y-%m-%d') if k.data else '' }}</td>
+        <td style="font-size:11px;white-space:nowrap">{{ k.hu }}</td>
+        <td style="font-size:11px">{{ k.dzial }}</td>
+        <td><span class="strefa-badge strefa-sm {{ 'strefa-zero' if k.strefa_docelowa=='STREFA_ZERO' else '' }}">{{ k.strefa_docelowa }}</span></td>
+        <td class="td-mono">{{ k.czas_hms }}</td>
+        <td><button type="button" class="btn-sm btn-warn" onclick="openPopup('{{ k.hu }}','{{ k.data.strftime('%Y-%m-%d') if k.data else '' }}')">➕</button></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="td-empty">Brak rekordów — wybierz zakres dat powyżej.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="table-box">
+  <div class="table-header">
+    <h3>Zapisane wpisy ({{ records|length }})</h3>
+    <input type="text" placeholder="🔍 Szukaj..." class="search-input" oninput="liveFilter('recTbl',this.value)">
+  </div>
+  <div style="overflow-x:auto">
+  <table class="data-table" id="recTbl" style="table-layout:auto">
+    <thead><tr><th>Data</th><th>HU</th><th>Dział</th><th>INNE</th><th>ZERO</th><th>Podstrefy</th><th>Akcje</th></tr></thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td style="white-space:nowrap">{{ r.data }}</td>
+        <td style="font-size:11px;white-space:nowrap">{{ r.hu }}</td>
+        <td style="font-size:11px">{{ r.dzial }}</td>
+        <td class="td-mono">{{ r.strefa_inne }}</td>
+        <td class="td-mono">{{ r.strefa_zero }}</td>
+        <td>{% for ps in r.podstrefy %}<div class="ps-chip"><span class="ps-name">{{ ps.podstrefa|replace('STREFA_','') }}</span><span class="ps-time">{{ ps.czas }}</span></div>{% endfor %}</td>
+        <td class="td-actions" style="white-space:nowrap">
+          <button type="button" class="btn-sm btn-warn" onclick="openPopupEdit({{ r|tojson|safe }})">✏️</button>
+          <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć?')">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="record_id" value="{{ r.id }}">
+            <button type="submit" class="btn-sm btn-del">🗑</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="td-empty">Brak wpisów.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- POPUP MODAL -->
+<div id="psModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;width:540px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+      <div>
+        <h3 id="popupTitle" style="font-size:17px;margin-bottom:4px"></h3>
+        <div id="popupSub" style="font-size:13px;color:var(--text2)"></div>
+      </div>
+      <button onclick="closePopup()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
+    </div>
+
+    <!-- Paski INNE i ZERO -->
+    <div id="popupBars" style="margin-bottom:20px"></div>
+
+    <!-- Podstrefy 1 i 2 -->
+    <h4 style="font-size:13px;color:var(--text2);margin-bottom:14px;border-top:1px solid var(--border);padding-top:14px">Przypisz podstrefy</h4>
+
+    {% for i in range(1,3) %}
+    <div style="margin-bottom:20px;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--text2);font-weight:600;min-width:14px">{{ i }}</span>
+        <select id="psSel{{ i }}" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:7px;font-size:13px">
+          <option value="">— podstrefa —</option>
+          {% for p in podstrefy_list %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text2);min-width:80px">% z INNE+ZERO</span>
+        <input type="range" id="psSlider{{ i }}" min="0" max="100" value="0"
+          style="flex:1;accent-color:#185FA5" oninput="onSlider({{ i }})">
+        <span id="psPct{{ i }}" style="font-size:13px;font-weight:700;min-width:38px;text-align:right;color:#93c5fd">0%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
+          <div id="psBar{{ i }}" style="height:100%;width:0;background:#185FA5;transition:width .1s;border-radius:4px"></div>
+        </div>
+        <span id="psTime{{ i }}" style="font-family:monospace;font-size:14px;font-weight:700;min-width:78px;text-align:right;color:var(--text)">00:00:00</span>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Pozostały czas -->
+    <div style="padding:12px 16px;background:var(--bg3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <span style="font-size:13px;color:var(--text2)">Nieprzypisany czas:</span>
+      <span id="psRemTime" style="font-family:monospace;font-size:15px;font-weight:700;color:#f59e0b">00:00:00</span>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" style="flex:1;padding:11px" onclick="savePopup()">✅ Zapisz</button>
+      <button class="btn-secondary" style="padding:11px 20px" onclick="closePopup()">Anuluj</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let PD = {hu:'',data:'',inne_s:0,zero_s:0,total_s:0};
+
+function sToHms(s){
+  s=Math.max(0,Math.round(s));
+  return String(Math.floor(s/3600)).padStart(2,'0')+':'+
+         String(Math.floor((s%3600)/60)).padStart(2,'0')+':'+
+         String(s%60).padStart(2,'0');
+}
+
+function onSlider(idx){
+  // Ogranicz: suma obu suwaków ≤ 100
+  const other = idx===1 ? 2 : 1;
+  const v1 = parseInt(document.getElementById('psSlider1').value)||0;
+  const v2 = parseInt(document.getElementById('psSlider2').value)||0;
+  if(v1+v2 > 100){
+    // Zredukuj ten który właśnie zmieniono żeby suma = 100
+    const maxThis = 100 - (idx===1 ? v2 : v1);
+    document.getElementById('psSlider'+idx).value = Math.max(0, maxThis);
+  }
+  for(let i=1;i<=2;i++){
+    const pct=parseInt(document.getElementById('psSlider'+i).value)||0;
+    const sec=Math.round(PD.total_s*pct/100);
+    document.getElementById('psPct'+i).textContent=pct+'%';
+    document.getElementById('psBar'+i).style.width=pct+'%';
+    document.getElementById('psTime'+i).textContent=sToHms(sec);
+  }
+  updateRem();
+}
+
+function updateRem(){
+  const p1=parseInt(document.getElementById('psSlider1').value)||0;
+  const p2=parseInt(document.getElementById('psSlider2').value)||0;
+  const used=Math.round(PD.total_s*(p1+p2)/100);
+  const rem=Math.max(0,PD.total_s-used);
+  const el=document.getElementById('psRemTime');
+  el.textContent=sToHms(rem);
+  el.style.color=rem===0?'#4ade80':(p1+p2>100?'#ef4444':'#f59e0b');
+}
+
+function openPopup(hu,data){
+  fetch('/api/inne_zero?hu='+encodeURIComponent(hu)+'&data='+data)
+    .then(r=>r.json()).then(d=>{
+      PD={...d,hu,data};
+      renderPopup();
+    }).catch(e=>alert('Błąd: '+e));
+}
+
+function openPopupEdit(rec){
+  fetch('/api/inne_zero?hu='+encodeURIComponent(rec.hu)+'&data='+rec.data)
+    .then(r=>r.json()).then(d=>{
+      PD={...d,hu:rec.hu,data:rec.data};
+      renderPopup();
+      if(rec.podstrefy){
+        rec.podstrefy.forEach((ps,i)=>{
+          if(i>=2) return;
+          const idx=i+1;
+          document.getElementById('psSel'+idx).value=ps.podstrefa||'';
+          const parts=(ps.czas||'00:00:00').split(':');
+          const sec=parseInt(parts[0])*3600+parseInt(parts[1])*60+parseInt(parts[2]);
+          const pct=PD.total_s>0?Math.min(100,Math.round(sec/PD.total_s*100)):0;
+          document.getElementById('psSlider'+idx).value=pct;
+        });
+        onSlider(1);
+      }
+    });
+}
+
+function renderPopup(){
+  document.getElementById('popupTitle').textContent='Podstrefy: '+PD.hu.replace('HU_','').replace(/_/g,' ');
+  document.getElementById('popupSub').textContent='Data: '+PD.data;
+  const bars=document.getElementById('popupBars');
+  bars.innerHTML='';
+  [{label:'STREFA_INNE',s:PD.inne_s,color:'#fb923c'},{label:'STREFA_ZERO',s:PD.zero_s,color:'#fda4af'}]
+    .filter(x=>x.s>0).forEach(x=>{
+      bars.innerHTML+=`<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:13px;color:${x.color};font-weight:600">${x.label}</span>
+          <span style="font-family:monospace;font-size:13px;font-weight:700">${sToHms(x.s)}</span>
+        </div>
+        <div style="height:8px;background:var(--bg3);border-radius:4px">
+          <div style="height:100%;width:100%;background:${x.color};border-radius:4px;opacity:.6"></div>
+        </div></div>`;
+    });
+  if(PD.total_s===0) bars.innerHTML='<div style="color:var(--text2);padding:8px 0">Brak czasu INNE/ZERO w tym dniu.</div>';
+
+  for(let i=1;i<=2;i++){
+    document.getElementById('psSlider'+i).value=0;
+    document.getElementById('psSel'+i).value='';
+    document.getElementById('psPct'+i).textContent='0%';
+    document.getElementById('psBar'+i).style.width='0';
+    document.getElementById('psTime'+i).textContent='00:00:00';
+  }
+  updateRem();
+  document.getElementById('psModal').style.display='flex';
+}
+
+function savePopup(){
+  const ps=[];
+  for(let i=1;i<=2;i++){
+    const sel=document.getElementById('psSel'+i).value;
+    const pct=parseInt(document.getElementById('psSlider'+i).value)||0;
+    if(sel&&pct>0) ps.push({podstrefa:sel,czas:document.getElementById('psTime'+i).textContent});
+  }
+  if(ps.length===0){alert('Wybierz podstrefę i ustaw suwak > 0.');return;}
+  fetch('/api/podstrefy_save',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({hu:PD.hu,data:PD.data,inne_s:PD.inne_s,zero_s:PD.zero_s,podstrefy:ps})
+  }).then(r=>r.json()).then(d=>{
+    if(d.status==='ok'){closePopup();location.reload();}
+  }).catch(e=>alert('Błąd: '+e));
+}
+
+function closePopup(){document.getElementById('psModal').style.display='none';}
+document.getElementById('psModal').addEventListener('click',e=>{if(e.target===document.getElementById('psModal'))closePopup();});
+
+function liveFilter(tid,q){
+  q=q.toLowerCase();
+  document.querySelectorAll('#'+tid+' tbody tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});
+}
+</script>
+{% endblock %}

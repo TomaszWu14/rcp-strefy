@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}KPI – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>📊 KPI</h2>
+  <a href="{{ url_for('eksport', data_od=data_od, data_do=data_do) }}" class="btn-secondary btn-sm">⬇ CSV</a>
+</div>
+
+{% if error %}
+<div class="empty-state"><div class="empty-icon">📂</div><h3>Brak danych</h3><p>Uruchom <code>fix_parquet.py</code> i odśwież.</p></div>
+{% else %}
+
+<form method="GET" class="filter-card" id="ff">
+  <div class="filter-row" style="gap:16px;align-items:flex-end;flex-wrap:wrap">
+    <div class="filter-group" style="min-width:160px">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Data od</label>
+      <input type="date" name="data_od" value="{{ data_od }}" style="font-size:13px;padding:8px 10px" onchange="this.form.submit()">
+    </div>
+    <div class="filter-group" style="min-width:160px">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Data do</label>
+      <input type="date" name="data_do" value="{{ data_do }}" style="font-size:13px;padding:8px 10px" onchange="this.form.submit()">
+    </div>
+    {% if is_kierownik or is_super_user %}
+    <div class="filter-group" style="min-width:200px">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Lider</label>
+      <select name="lider_f" style="font-size:13px;padding:8px 10px" onchange="this.form.submit()">
+        <option value="">— Wszyscy liderzy —</option>
+        {% for l in liderzy %}<option value="{{ l.login }}" {% if l.login==lider_f %}selected{% endif %}>{{ l.name or l.login }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="filter-group" style="min-width:220px">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Pracownik</label>
+      <select name="pracownik" style="font-size:13px;padding:8px 10px" onchange="this.form.submit()">
+        <option value="">— Wszyscy ({{ pracownicy|length }}) —</option>
+        {% for p in pracownicy %}<option value="{{ p }}" {% if p==pracownik_f %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-group" style="min-width:220px;flex:1">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Strefy</label>
+      <select name="strefy" multiple size="5" style="font-size:12px" onchange="this.form.submit()">
+        {% for s in strefy_all %}<option value="{{ s }}" {% if s in strefy_f %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filter-group" style="min-width:130px">
+      <label style="font-size:13px;font-weight:500;margin-bottom:6px">Porównaj z</label>
+      <input type="month" name="miesiac_b" value="{{ miesiac_b }}" style="font-size:13px;padding:8px 10px" onchange="this.form.submit()" title="Wybierz miesiąc do porównania">
+    </div>
+    <div class="filter-group" style="align-self:flex-end;padding-bottom:2px">
+      <a href="{{ url_for('kpi') }}" class="btn-secondary">✕ Reset</a>
+    </div>
+  </div>
+  {% if strefy_f %}<p class="filter-hint" style="margin-top:8px">🔵 <strong>{{ strefy_f|join(' · ') }}</strong></p>{% endif %}
+  {% if lider_f %}<p class="filter-hint" style="margin-top:4px">👤 Lider: <strong>{{ lider_f }}</strong></p>{% endif %}
+  {% if miesiac_b %}<p class="filter-hint" style="margin-top:4px">📅 Porównanie z: <strong>{{ miesiac_b }}</strong></p>{% endif %}
+</form>
+
+<div class="kpi-summary">
+  <div class="kpi-card kpi-total"><div class="kpi-icon">⏱</div><div><div class="kpi-val">{{ total_hms }}</div><div class="kpi-label">{{ data_od }} – {{ data_do }}</div></div></div>
+  <div class="kpi-card"><div class="kpi-icon">📍</div><div><div class="kpi-val">{{ kpi_data|length }}</div><div class="kpi-label">Stref</div></div></div>
+  {% if is_kierownik or is_lider %}<div class="kpi-card"><div class="kpi-icon">👥</div><div><div class="kpi-val">{{ pracownik_f if pracownik_f else pracownicy|length }}</div><div class="kpi-label">Pracownicy</div></div></div>{% endif %}
+</div>
+
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+  <button class="btn-sm chart-type-btn active" id="btnBar" onclick="setType('bar')">📊 Słupki</button>
+  <button class="btn-sm chart-type-btn" id="btnLine" onclick="setType('line')">📈 Linie</button>
+  <span class="text-muted" style="font-size:11px;margin-left:8px">Top 10 stref · oś X = data · oś Y = godziny</span>
+</div>
+<div class="chart-box chart-full" style="margin-bottom:20px;padding:16px;height:360px;position:relative">
+  <canvas id="chartMain"></canvas>
+</div>
+
+<div class="table-box">
+  <div class="table-header">
+    <h3>Strefa × Miesiąc</h3>
+    <span class="text-muted">{{ kpi_data|length }} stref</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="data-table pivot-table" id="kpiTbl" style="table-layout:auto">
+    <thead>
+      <tr>
+        <th style="min-width:170px;position:sticky;left:0;background:var(--bg2);z-index:3">Strefa</th>
+        {% for col in pivot_cols %}<th style="min-width:88px;text-align:center;white-space:nowrap">{{ col }}</th>{% endfor %}
+        <th style="min-width:90px;background:rgba(55,86,35,.15)">SUMA</th>
+        {% if miesiac_b %}<th style="min-width:90px;background:rgba(124,58,237,.15);white-space:nowrap">{{ miesiac_b }}</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in kpi_data %}
+      <tr>
+        <td style="position:sticky;left:0;background:var(--bg2);padding:5px 10px">
+          <span class="strefa-badge" style="background:{{ r.color }}22;color:{{ r.color }};border:1px solid {{ r.color }}44;font-size:11px;white-space:nowrap">{{ r.strefa_docelowa }}</span>
+        </td>
+        {% for col in pivot_cols %}
+        {% set v = r.pivot.get(col,'') %}
+        <td style="font-size:11px;text-align:center;padding:4px 6px;font-family:monospace">
+          {% if v and v != '00:00:00' %}{{ v }}{% else %}<span style="color:var(--border)">·</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td style="font-size:11px;font-family:monospace;font-weight:700;padding:4px 10px;background:rgba(55,86,35,.08)">{{ r.czas_hms }}</td>
+        {% if miesiac_b %}
+        {% set vb = miesiac_b_data.get(r.strefa_docelowa, '') %}
+        <td style="font-size:11px;font-family:monospace;padding:4px 10px;background:rgba(124,58,237,.08);color:#c4b5fd">
+          {% if vb and vb != '00:00:00' %}{{ vb }}{% else %}<span style="color:var(--border)">·</span>{% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="background:rgba(55,86,35,.15);font-weight:700">
+        <td style="position:sticky;left:0;background:rgba(55,86,35,.2);padding:6px 10px;font-size:12px">SUMA</td>
+        {% for col in pivot_cols %}<td style="font-size:11px;text-align:center;padding:4px 6px;font-family:monospace">{{ col_totals.get(col,'') }}</td>{% endfor %}
+        <td style="font-size:11px;font-family:monospace;font-weight:700;padding:4px 10px">{{ total_hms }}</td>
+        {% if miesiac_b %}<td style="font-size:11px;font-family:monospace;padding:4px 10px;background:rgba(124,58,237,.15)">—</td>{% endif %}
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+</div>
+
+<script src="{{ url_for('static',filename='js/excel_filter.js') }}"></script>
+<script>
+const C_LABELS   = {{ chart_labels|safe }};
+const C_DATASETS = {{ chart_datasets|safe }};
+let myChart = null;
+
+function buildChart(type){
+  const canvas = document.getElementById('chartMain');
+  if(!canvas) return;
+  if(myChart){ myChart.destroy(); myChart = null; }
+  if(!C_LABELS || C_LABELS.length === 0){
+    canvas.parentElement.innerHTML = '<p style="text-align:center;color:var(--text2);padding:80px 0">Brak danych do wykresu</p>';
+    return;
+  }
+  const ds = C_DATASETS.map(d => ({
+    label:            d.label,
+    data:             d.data,
+    backgroundColor:  d.backgroundColor + (type==='bar' ? 'cc' : ''),
+    borderColor:      d.borderColor,
+    borderWidth:      type==='line' ? 2 : 1,
+    fill:             false,
+    tension:          0.3,
+    pointRadius:      type==='line' ? 3 : 0,
+    pointHoverRadius: 5,
+    spanGaps:         true,
+  }));
+  myChart = new Chart(canvas, {
+    type:  type,
+    data:  {labels: C_LABELS, datasets: ds},
+    options:{
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {duration: 200},
+      interaction: {mode:'index', intersect:false},
+      plugins:{
+        legend:{
+          position:'bottom',
+          labels:{boxWidth:10, font:{size:11}, padding:12, usePointStyle:true}
+        },
+        tooltip:{
+          callbacks:{
+            label: c => ' '+c.dataset.label+': '+(c.parsed.y != null ? c.parsed.y+'h' : '—')
+          }
+        }
+      },
+      scales:{
+        x:{
+          stacked: type==='bar',
+          ticks:{maxRotation:45, font:{size:10}, maxTicksLimit:40},
+          grid:{color:'rgba(255,255,255,0.05)'}
+        },
+        y:{
+          stacked: type==='bar',
+          title:{display:true, text:'godziny', font:{size:11}},
+          ticks:{font:{size:10}},
+          grid:{color:'rgba(255,255,255,0.05)'}
+        }
+      }
+    }
+  });
+}
+
+function setType(type){
+  document.getElementById('btnBar').classList.toggle('active',  type==='bar');
+  document.getElementById('btnLine').classList.toggle('active', type==='line');
+  buildChart(type);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => buildChart('bar'), 100);
+});
+
+initExcelFilters('kpiTbl',[0]);
+</script>
+{% endif %}
+{% endblock %}

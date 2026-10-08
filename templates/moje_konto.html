@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Moje konto – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>👤 Moje konto</h2>
+</div>
+
+<div class="two-col" style="align-items:start">
+
+  <!-- PROFIL -->
+  <div class="form-card">
+    <h3>Profil użytkownika</h3>
+    <table class="data-table" style="margin-bottom:0">
+      <tbody>
+        <tr><td style="color:var(--text2);width:140px">Login</td><td class="td-mono">{{ login }}</td></tr>
+        <tr><td style="color:var(--text2)">Imię i nazwisko</td><td>{{ u.get('name','—') }}</td></tr>
+        <tr><td style="color:var(--text2)">HU</td><td class="td-mono">{{ u.get('hu','—') or '—' }}</td></tr>
+        <tr><td style="color:var(--text2)">Dział</td><td>{{ u.get('dzial','—') or '—' }}</td></tr>
+        <tr><td style="color:var(--text2)">Grupa zasobów</td><td>{{ u.get('resource_group','—') or '—' }}</td></tr>
+        <tr>
+          <td style="color:var(--text2)">Rola</td>
+          <td>
+            {% if u.get('role') == 'kierownik' %}
+              <span class="badge badge-mgr">👑 Admin</span>
+            {% elif u.get('role') == 'super_user' %}
+              <span class="badge badge-super">⭐ Super User</span>
+            {% else %}
+              <span class="badge badge-ldr">🔑 Lider</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--text2)">Status</td>
+          <td>
+            <span class="status-badge {{ 'status-zaakceptowane' if u.get('aktualny',True) else 'status-odrzucone' }}">
+              {{ 'aktywny' if u.get('aktualny',True) else 'nieaktywny' }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Zmiana hasła -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <h4 style="font-size:13px;margin-bottom:12px">🔑 Zmiana hasła</h4>
+      <form method="POST">
+        <input type="hidden" name="action" value="change_password">
+        <div class="form-group">
+          <label>Obecne hasło</label>
+          <input type="password" name="stare_haslo" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label>Nowe hasło <span style="color:var(--text2);font-size:11px">(min. 4 znaki)</span></label>
+          <input type="password" name="nowe_haslo" required autocomplete="new-password" minlength="4">
+        </div>
+        <div class="form-group">
+          <label>Powtórz nowe hasło</label>
+          <input type="password" name="powtorz_haslo" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top:6px">Zmień hasło</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- UPRAWNIENIA -->
+  <div class="form-card">
+    <h3>Moje uprawnienia</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+      Uprawnienia wynikają z roli <strong>{{ u.get('role','lider') }}</strong>
+      {% if u.get('permissions') %} z indywidualnymi modyfikacjami{% endif %}.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      {% for perm_key, perm_label in permission_labels.items() %}
+      {% set has = effective_perms.get(perm_key, false) %}
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;background:{{ 'rgba(74,222,128,.08)' if has else 'rgba(239,68,68,.07)' }};border:1px solid {{ 'rgba(74,222,128,.25)' if has else 'rgba(239,68,68,.2)' }}">
+        <span style="font-size:15px">{{ '✅' if has else '❌' }}</span>
+        <span style="font-size:13px">{{ perm_label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

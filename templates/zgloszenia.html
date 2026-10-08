@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Zgłoszenia – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>⚠️ Zgłoszenia niezgodności</h2>
+  <form method="GET" class="filter-form">
+    <select name="filtr" onchange="this.form.submit()">
+      <option value="wszystkie" {% if filtr=='wszystkie' %}selected{% endif %}>Wszystkie</option>
+      <option value="nowe"          {% if filtr=='nowe' %}selected{% endif %}>Nowe</option>
+      <option value="zaakceptowane" {% if filtr=='zaakceptowane' %}selected{% endif %}>Zaakceptowane</option>
+      <option value="odrzucone"     {% if filtr=='odrzucone' %}selected{% endif %}>Odrzucone</option>
+    </select>
+  </form>
+</div>
+
+<div class="two-col">
+  <div class="form-card">
+    <h3>Nowe zgłoszenie</h3>
+    <form method="POST">
+      <input type="hidden" name="action" value="nowe">
+      <div class="form-group"><label>Data pracy</label>
+        <input type="date" name="data_pracy" value="{{ request.args.get('data','') }}" required>
+      </div>
+      {% if is_kierownik or is_lider %}
+      <div class="form-group"><label>Pracownik</label>
+        <select name="pracownik" required>
+          <option value="">— wybierz —</option>
+          {% for p in pracownicy %}<option value="{{ p }}" {% if p==request.args.get('pracownik') %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      {% else %}
+      <input type="hidden" name="pracownik" value="{{ user_info.get('name','') }}">
+      {% endif %}
+      <div class="form-group"><label>Typ niezgodności</label>
+        <select name="typ_problemu" id="typSel" onchange="toggleTyp(this.value)" required>
+          <option value="">— wybierz —</option>
+          <option value="bledna_strefa">❌ Błędna strefa — przenieś czas</option>
+          <option value="brak_odbicia">🚪 Brak odbicia skanera</option>
+          <option value="nadmiar_czasu">⏱ Nadmiar czasu w strefie</option>
+          <option value="brak_czasu">⌛ Brakujący czas w strefie</option>
+          <option value="inne">📝 Inne</option>
+        </select>
+      </div>
+      <div id="blokStrefa" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>Strefa błędna (z)</label>
+            <select name="strefa_z">
+              <option value="">—</option>
+              {% for s in strefy %}<option value="{{ s }}" {% if s==request.args.get('strefa_z') %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label>Strefa prawidłowa (do)</label>
+            <select name="strefa_do">
+              <option value="">—</option>
+              {% for s in strefy %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Czas do przeniesienia (GG:MM:SS)</label>
+          <input type="text" name="czas_korekty" placeholder="00:00:00">
+        </div>
+      </div>
+      <div id="blokBrak" style="display:none">
+        <div class="form-group"><label>Strefa bez odbicia</label>
+          <select name="strefa_brak">
+            <option value="">—</option>
+            {% for s in strefy %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Godzina wejścia</label><input type="time" name="godz_wejscia"></div>
+          <div class="form-group"><label>Godzina wyjścia</label><input type="time" name="godz_wyjscia"></div>
+        </div>
+      </div>
+      <div id="blokNadmiar" style="display:none">
+        <div class="form-group"><label>Strefa z błędnym czasem</label>
+          <select name="strefa_nadmiar">
+            <option value="">—</option>
+            {% for s in strefy %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label>Czas faktyczny (GG:MM:SS)</label>
+          <input type="text" name="czas_faktyczny" placeholder="00:00:00">
+        </div>
+      </div>
+      <div class="form-group"><label>Komentarz</label>
+        <textarea name="opis" rows="3" placeholder="Dodatkowe informacje..." required></textarea>
+      </div>
+      <button type="submit" class="btn-primary">Wyślij ⚠️</button>
+    </form>
+  </div>
+
+  <div class="table-box">
+    <div class="table-header"><h3>Lista ({{ zgloszenia|length }})</h3></div>
+    <div style="overflow-x:auto">
+    <table class="data-table" id="zTbl" style="table-layout:auto">
+      <thead>
+        <tr>
+          <th>Data</th><th>Pracownik</th><th>Typ</th><th>Strefa z→do / szczegóły</th>
+          <th>Status</th><th>Kto / kiedy</th>
+          {% if is_kierownik or is_lider %}<th>Akcje</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for z in zgloszenia %}
+        <tr>
+          <td style="white-space:nowrap">{{ z.data_pracy }}</td>
+          <td style="white-space:nowrap">{{ z.pracownik }}</td>
+          <td style="font-size:11px;white-space:nowrap">{{ z.get('typ_problemu','') }}</td>
+          <td style="font-size:11px">
+            {% if z.get('strefa_z') %}<span class="strefa-badge strefa-sm">{{ z.strefa_z }}</span>{% endif %}
+            {% if z.get('strefa_do') %}<span class="arrow">→</span><span class="strefa-badge strefa-sm strefa-green">{{ z.strefa_do }}</span>{% endif %}
+            {% if z.get('czas_korekty') %} <span class="td-mono">{{ z.czas_korekty }}</span>{% endif %}
+            {% if z.get('strefa_brak') %}<span class="strefa-badge strefa-sm">{{ z.strefa_brak }}</span> {{ z.get('godz_wejscia','') }}–{{ z.get('godz_wyjscia','') }}{% endif %}
+            {% if z.get('strefa_nadmiar') %}<span class="strefa-badge strefa-sm">{{ z.strefa_nadmiar }}</span> faktycznie: <span class="td-mono">{{ z.get('czas_faktyczny','') }}</span>{% endif %}
+            <div style="color:var(--text2);margin-top:2px">{{ z.opis[:60] }}{% if z.opis|length>60 %}…{% endif %}</div>
+          </td>
+          <td><span class="status-badge status-{{ z.status|replace(' ','_') }}">{{ z.status }}</span></td>
+          <td style="font-size:11px;color:var(--text2)">
+            {{ z.get('zglaszajacy_name', z.get('zglaszajacy','')) }}<br>{{ z.timestamp[:10] }}
+            {% if z.get('akceptowal_name') %}<br><em>→ {{ z.akceptowal_name }}</em>{% endif %}
+          </td>
+          {% if is_kierownik or is_lider %}
+          <td class="td-actions" style="white-space:nowrap">
+            {% if z.status == 'nowe' %}
+            <form method="POST" style="display:inline">
+              <input type="hidden" name="action" value="akceptuj">
+              <input type="hidden" name="zid" value="{{ z.id }}">
+              <button type="submit" class="btn-sm btn-ok" title="Zaakceptuj">✓</button>
+            </form>
+            <button class="btn-sm btn-del" onclick="showOdrzuc('{{ z.id }}')" title="Odrzuć">✕</button>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="td-empty">Brak zgłoszeń.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<div id="odrzucModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;width:400px;max-width:90vw">
+    <h3 style="margin-bottom:14px">Odrzuć zgłoszenie</h3>
+    <form method="POST">
+      <input type="hidden" name="action" value="odrzuc">
+      <input type="hidden" name="zid" id="odrzucZid">
+      <div class="form-group"><label>Powód</label><textarea name="powod" rows="3" required style="width:100%"></textarea></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button type="submit" class="btn-primary">Odrzuć</button>
+        <button type="button" class="btn-secondary" onclick="closeOdrzuc()">Anuluj</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{{ url_for('static',filename='js/excel_filter.js') }}"></script>
+<script>
+function toggleTyp(v){
+  document.getElementById('blokStrefa').style.display  = v==='bledna_strefa'?'block':'none';
+  document.getElementById('blokBrak').style.display    = v==='brak_odbicia'?'block':'none';
+  document.getElementById('blokNadmiar').style.display = (v==='nadmiar_czasu'||v==='brak_czasu')?'block':'none';
+}
+function showOdrzuc(id){document.getElementById('odrzucZid').value=id;document.getElementById('odrzucModal').style.display='flex';}
+function closeOdrzuc(){document.getElementById('odrzucModal').style.display='none';}
+initExcelFilters('zTbl',[0,1,2,4]);
+</script>
+{% endblock %}

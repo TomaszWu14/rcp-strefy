@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Strefa KONIEC – TIMER{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>🏁 Strefa KONIEC – Podstrefy i podprocesy</h2>
+</div>
+
+<div class="two-col">
+  <!-- Formularz -->
+  <div class="form-card" id="formCard">
+    <h3>{{ "✏️ Edytuj rekord" if edit_record else "➕ Nowy wpis" }}</h3>
+    <form method="POST" id="koniecForm">
+      {% if edit_record %}
+      <input type="hidden" name="record_id" value="{{ edit_record.id }}">
+      {% endif %}
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dział</label>
+          <select name="dzial" required>
+            <option value="">— wybierz —</option>
+            {% for d in dzialy %}
+            <option value="{{ d }}" {% if edit_record and edit_record.dzial==d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" name="data_pracy" required
+            value="{{ edit_record.data if edit_record else '' }}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>HU (pracownik)</label>
+        <input type="text" name="hu" list="hu-list" placeholder="HU_NAZWISKO_IMI" required
+          value="{{ edit_record.hu if edit_record else (koniec_user_info.get('hu','') if not is_kierownik else '') }}">
+        <datalist id="hu-list">
+          {% for h in hu_list %}<option value="{{ h }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>STREFA_INNE</label>
+          <input type="text" name="strefa_inne" placeholder="00:00:00" pattern="\d{2}:\d{2}:\d{2}"
+            value="{{ edit_record.strefa_inne if edit_record else '00:00:00' }}">
+        </div>
+        <div class="form-group">
+          <label>STREFA_ZERO</label>
+          <input type="text" name="strefa_zero" placeholder="00:00:00" pattern="\d{2}:\d{2}:\d{2}"
+            value="{{ edit_record.strefa_zero if edit_record else '00:00:00' }}">
+        </div>
+      </div>
+
+      <!-- Podstrefy dynamiczne (1-5) -->
+      <div class="podstrefy-section">
+        <div class="podstrefy-header">
+          <h4>Podstrefy i procesy</h4>
+          <span class="hint">Wypełnij od 1 do 5 podstref</span>
+        </div>
+        {% for i in range(1, 6) %}
+        {% set ps = edit_record.podstrefy[loop.index0] if edit_record and edit_record.podstrefy|length >= loop.index else None %}
+        <div class="podstrefa-row" id="psRow{{ i }}">
+          <span class="ps-num">{{ i }}</span>
+          <select name="podstrefa_{{ i }}" class="ps-select">
+            <option value="">— podstrefa —</option>
+            {% for p in podstrefy %}
+            <option value="{{ p }}" {% if ps and ps.podstrefa==p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="czas_{{ i }}" placeholder="00:00:00" class="ps-czas"
+            pattern="\d{2}:\d{2}:\d{2}"
+            value="{{ ps.czas if ps else '' }}">
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">
+          {{ "💾 Zapisz zmiany" if edit_record else "✅ Dodaj wpis" }}
+        </button>
+        {% if edit_record %}
+        <a href="{{ url_for('strefa_koniec') }}" class="btn-secondary">Anuluj</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Lista rekordów -->
+  <div class="table-box">
+    <div class="table-header">
+      <h3>Wpisy ({{ records|length }})</h3>
+      <form method="GET" class="inline-form">
+        <input type="text" name="search" value="{{ search }}" placeholder="🔍 HU lub data..." class="search-input">
+        <button type="submit" class="btn-sm btn-ok">Szukaj</button>
+        {% if search %}<a href="{{ url_for('strefa_koniec') }}" class="btn-sm">✕</a>{% endif %}
+      </form>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th><th>HU</th><th>Dział</th>
+          <th>INNE</th><th>ZERO</th><th>Podstrefy</th><th>Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.data }}</td>
+          <td class="td-mono">{{ r.hu }}</td>
+          <td>{{ r.dzial }}</td>
+          <td class="td-mono">{{ r.strefa_inne }}</td>
+          <td class="td-mono">{{ r.strefa_zero }}</td>
+          <td>
+            {% for ps in r.podstrefy %}
+            <div class="ps-chip">
+              <span class="ps-name">{{ ps.podstrefa|replace('STREFA_','') }}</span>
+              <span class="ps-time">{{ ps.czas }}</span>
+            </div>
+            {% endfor %}
+          </td>
+          <td class="td-actions">
+            <a href="{{ url_for('strefa_koniec') }}?edit={{ r.id }}" class="btn-sm btn-warn" title="Edytuj">✏️</a>
+            <form method="POST" style="display:inline" onsubmit="return confirm('Usunąć?')">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="record_id" value="{{ r.id }}">
+              <button type="submit" class="btn-sm btn-del" title="Usuń">🗑</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="td-empty">Brak wpisów</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// Skocz do formularza przy edycji
+{% if edit_record %}
+document.getElementById('formCard').scrollIntoView({behavior:'smooth'});
+{% endif %}
+// Walidacja czasu HH:MM:SS
+document.querySelectorAll('.ps-czas').forEach(inp=>{
+  inp.addEventListener('blur',()=>{
+    const v=inp.value.trim();
+    if(v && !/^\d{2}:\d{2}:\d{2}$/.test(v)){
+      inp.style.borderColor='#e24b4a';
+    } else {
+      inp.style.borderColor='';
+    }
+  });
+});
+</script>
+{% endblock %}
