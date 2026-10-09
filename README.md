@@ -47,6 +47,17 @@ Poza trybem demo klucz sesji jest wymagany: ustaw `FLASK_SECRET_KEY` (zob. `.env
 inaczej aplikacja nie wystartuje. Nowe konta, reset hasła i import z Excela bez podanego
 hasła dostają losowe hasło jednorazowe, pokazywane kierownikowi w komunikacie.
 
+### Docker / publiczne demo (Coolify)
+
+```bash
+docker build -t rcp-demo .
+docker run -p 8000:8000 -e DEMO_MODE=1 -e FLASK_SECRET_KEY=$(python -c "import secrets;print(secrets.token_hex(32))") rcp-demo
+```
+
+`DEMO_MODE=1` przy każdym starcie generuje świeże dane syntetyczne (konta z hasłem `demo123`, np. `kierownik`)
+i blokuje ustawienia SMTP oraz wysyłkę poczty – jawne konto demo nie może użyć serwera do wysyłania e-maili.
+Okresowy reset danych bez restartu: `python tools/generate_demo_data.py` (np. Scheduled Task w Coolify).
+
 ## Testy
 
 ```bash
