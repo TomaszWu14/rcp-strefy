@@ -44,7 +44,7 @@
       <span class="badge badge-mgr">👑 Admin</span>
     {% elif is_super_user %}
       <span class="badge" style="background:#7c3aed;color:#fff">⭐ Super User</span>
-    {% else %}
+    {% elif is_lider %}
       <span class="badge badge-ldr">🔑 Lider</span>
     {% endif %}
     <a href="{{ url_for('moje_konto') }}" class="nav-name {% if request.endpoint=='moje_konto' %}active{% endif %}" style="text-decoration:none">{{ user_info.get('name', current_user) }}</a>

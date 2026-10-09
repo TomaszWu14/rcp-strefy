@@ -84,6 +84,15 @@ class ScopeTests(unittest.TestCase):
         c = self.client("kierownik")
         self.assertEqual(self.visible(c, "/szczegoly"), self.all_workers)
 
+    # Regresja #1: odznaka „🔑 Lider” tylko dla roli lider.
+    def test_worker_has_no_leader_badge(self):
+        body = self.client("JKOWALSKI").get("/szczegoly").get_data(as_text=True)
+        self.assertNotIn("🔑 Lider", body)
+
+    def test_leader_has_leader_badge(self):
+        body = self.client("lider.kpl").get("/szczegoly").get_data(as_text=True)
+        self.assertIn("🔑 Lider", body)
 
 if __name__ == "__main__":
     unittest.main()
+
