@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.idea
+data/*.json
+data/*.parquet
+*.parquet
+docs
+tests

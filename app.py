@@ -22,6 +22,9 @@ if not app.secret_key:
         raise RuntimeError("Brak FLASK_SECRET_KEY (zob. .env.example). Do lokalnego demo: FLASK_DEBUG=1.")
     app.secret_key = secrets.token_hex(32)
 
+# Publiczne demo: jawne konta demo, więc bez ustawień SMTP i bez wysyłki poczty z serwera.
+DEMO_MODE = os.environ.get("DEMO_MODE") == "1"
+
 DATA_DIR    = Path(__file__).parent / "data"
 _P1 = Path(__file__).parent / "czasy_calc.parquet"
 _P2 = Path(__file__).parent / "data" / "czasy_calc.parquet"
@@ -142,7 +145,7 @@ def load_smtp():
 def send_email_alert(subject, body):
     """Wyślij email do kierowników — działa tylko jeśli SMTP skonfigurowane."""
     cfg = load_smtp()
-    if not cfg.get("enabled") or not cfg.get("user"):
+    if DEMO_MODE or not cfg.get("enabled") or not cfg.get("user"):
         return False
     try:
         import smtplib
@@ -1510,6 +1513,9 @@ def ustawienia():
     if not has_permission("manage_settings"):
         return redirect(url_for("dashboard"))
     cfg = load_smtp()
+    if request.method == "POST" and DEMO_MODE:
+        flash("W publicznym demo ustawienia SMTP są zablokowane.", "error")
+        return redirect(url_for("ustawienia"))
     if request.method == "POST":
         cfg = {
             "server":   request.form.get("server",""),
