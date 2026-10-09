@@ -8,6 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn==23.0.0 \
     && useradd --create-home --uid 1000 timer
 COPY --chown=timer . .
+RUN mkdir -p data && chown timer data  # data/ nie jest w repo, a /app należy do roota
 USER timer
 
 EXPOSE 8000

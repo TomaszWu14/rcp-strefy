@@ -31,8 +31,9 @@ jobs:
         run: docker build -t rcp-demo .
       - name: Smoke
         run: |
+          trap 'docker logs rcp' ERR
           docker run -d --name rcp -p 8000:8000 -e DEMO_MODE=1 -e FLASK_SECRET_KEY=ci rcp-demo
           for i in $(seq 30); do curl -sf http://127.0.0.1:8000/ >/dev/null && break; sleep 2; done
           curl -sf http://127.0.0.1:8000/ | grep -q 'name="password"'
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'username=kierownik&password=demo123' http://127.0.0.1:8000/)
-          test "$code" = 302 || { docker logs rcp; exit 1; }
+          test "$code" = 302
